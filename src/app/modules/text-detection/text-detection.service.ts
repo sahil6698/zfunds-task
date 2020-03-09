@@ -61,21 +61,33 @@ export default class ImageDetectionService {
         let flag = false;
         for(const textAnnotation of textAnnotations) {
             const  {description} = textAnnotation;
-            const separatedByEndOfLine = description.split('\n');
-            const arrLen = separatedByEndOfLine.length;
             if (name === undefined) {
-                const indexOfName = separatedByEndOfLine.indexOf('ATH/Name');
-                if (indexOfName === -1|| indexOfName === arrLen) {
-                    continue;
+                let indexOfName;
+                indexOfName = description.indexOf('/Name\n');
+                let nameIndexToIncrement = 6;
+                if (indexOfName === -1){
+                    indexOfName = description.indexOf('/ Name\n');
+                    nameIndexToIncrement = 7;
                 }
-                name = separatedByEndOfLine[indexOfName + 1];
+                const strLen = description.length;
+                if (indexOfName === -1 || indexOfName+nameIndexToIncrement === strLen){
+                    continue;
+                } else {
+                    const nameSubString = description.slice(indexOfName+nameIndexToIncrement);
+                    const nameEndingIndex = nameSubString.indexOf('\n');
+                    name = nameSubString.slice(0, nameEndingIndex);
+                }
             }
-            if(dateOfBirth === undefined) {
-                const indexOfDateOfBirth = separatedByEndOfLine.indexOf('Date of Birth');
-                if (indexOfDateOfBirth === -1 || indexOfDateOfBirth === arrLen) {
+            if (dateOfBirth === undefined) {
+                const indexOfDOB = description.indexOf('Date of Birth\n');
+                const strLen = description.length;
+                if (indexOfDOB === -1 || indexOfDOB+14 === strLen){
                     continue;
+                } else {
+                    const dobSubString = description.slice(indexOfDOB+14);
+                    const dobEndingIndex = dobSubString.indexOf('\n');
+                    dateOfBirth = dobSubString.slice(0, dobEndingIndex);
                 }
-                dateOfBirth = separatedByEndOfLine[indexOfDateOfBirth+1];
             }
             if (dateOfBirth !== undefined && name!==undefined) {
                 flag = true;
