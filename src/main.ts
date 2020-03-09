@@ -12,7 +12,6 @@ async function bootstrap() {
   // app.use(logger.logInfo());
   app.enableCors();
   // app.use(logger.logError());
-  console.log(process.env.HTTP_PORT);
   await app.listen(port);
 }
 

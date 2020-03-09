@@ -17,8 +17,10 @@ export default class ImageDetectionService {
             const [result] = await visionClient.documentTextDetection(fileToUpload.buffer);
             const {textAnnotations} = result;
             const {name, dateOfBirth} = this.getNameAndDOBFromVisionRes(textAnnotations);
-            const fileName = name + " " + dateOfBirth + " " + Date.now();
-            await this.s3Upload(s3, fileToUpload, fileName);
+            const fileName = name +  "_" + Date.now();
+            if (name.length > 0 && dateOfBirth.length > 0) {
+                await this.s3Upload(s3, fileToUpload, fileName);
+            }
             return {
                 name,
                 dateOfBirth
@@ -31,9 +33,9 @@ export default class ImageDetectionService {
     private async s3Upload(s3, fileToUpload, fileName) {
         let fileTypeOnS3;
         if (fileToUpload.mimeType === 'image/jpeg' || 'image/jpg') {
-            fileTypeOnS3 = 'jpeg'
+            fileTypeOnS3 = '.jpeg'
         } else if (fileToUpload.mimeType === 'image/png') {
-            fileTypeOnS3 = 'png'
+            fileTypeOnS3 = '.png'
         } else{
             throw new HttpException('Unsupported file', 400);
         }
@@ -59,8 +61,14 @@ export default class ImageDetectionService {
     } {
         let name, dateOfBirth;
         let flag = false;
+        let isPAN = false;
         for(const textAnnotation of textAnnotations) {
             const  {description} = textAnnotation;
+            if (!isPAN) {
+                if (description.includes('Permanent Account Number Card')) {
+                    isPAN = true;
+                }
+            }
             if (name === undefined) {
                 let indexOfName;
                 indexOfName = description.indexOf('/Name\n');
@@ -70,7 +78,7 @@ export default class ImageDetectionService {
                     nameIndexToIncrement = 7;
                 }
                 const strLen = description.length;
-                if (indexOfName === -1 || indexOfName+nameIndexToIncrement === strLen){
+                if (indexOfName === -1 || indexOfName+nameIndexToIncrement >= strLen){
                     continue;
                 } else {
                     const nameSubString = description.slice(indexOfName+nameIndexToIncrement);
@@ -81,7 +89,7 @@ export default class ImageDetectionService {
             if (dateOfBirth === undefined) {
                 const indexOfDOB = description.indexOf('Date of Birth\n');
                 const strLen = description.length;
-                if (indexOfDOB === -1 || indexOfDOB+14 === strLen){
+                if (indexOfDOB === -1 || indexOfDOB+14 >= strLen){
                     continue;
                 } else {
                     const dobSubString = description.slice(indexOfDOB+14);
@@ -94,13 +102,17 @@ export default class ImageDetectionService {
                 break;
             }
         }
-        if (flag) {
-            return {
-                name,
-                dateOfBirth
-            }
+        if(isPAN) {
+           if (flag) {
+               return {
+                   name, dateOfBirth
+               }
+           } else {
+               throw new HttpException(' Please try again with a clear photo, ' +
+                   'Name and DOB could not be determined from the uploaded image', 400);
+           }
         } else {
-            throw new HttpException('Name and Date of birth could not be determined from the image', 400);
+            throw new HttpException(' Uploaded image is not a valid PAN photo', 400);
         }
     }
 
