@@ -4,3 +4,4 @@ node_modules
 image.png
 yarn-error.log
 yarn.lock
+dist
