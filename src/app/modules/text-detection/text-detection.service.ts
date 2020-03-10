@@ -1,36 +1,40 @@
 import {HttpException, Injectable} from "@nestjs/common";
 import vision from '@google-cloud/vision';
 import AWS from 'aws-sdk'
+import S3 from "aws-sdk/clients/s3";
 @Injectable()
 export default class ImageDetectionService {
+    private readonly s3: S3;
+    constructor() {
+        AWS.config.update({
+            accessKeyId: process.env.AWS_ACCESS_ID,
+            secretAccessKey: process.env.AWS_SECRET_KEY
+        });
+        this.s3 = new AWS.S3();
+    }
     public async getImageText(fileToUpload): Promise<{
         name: string,
         dateOfBirth: string
     }> {
         try {
-            AWS.config.update({
-                accessKeyId: process.env.AWS_ACCESS_ID,
-                secretAccessKey: process.env.AWS_SECRET_KEY
-            });
-            const s3 = new AWS.S3();
             const visionClient = new vision.ImageAnnotatorClient();
             const [result] = await visionClient.documentTextDetection(fileToUpload.buffer);
             const {textAnnotations} = result;
             const {name, dateOfBirth} = this.getNameAndDOBFromVisionRes(textAnnotations);
             const fileName = name +  "_" + Date.now();
             if (name.length > 0 && dateOfBirth.length > 0) {
-                await this.s3Upload(s3, fileToUpload, fileName);
+                await this.s3Upload(fileToUpload, fileName);
             }
             return {
                 name,
                 dateOfBirth
             }
         } catch (e) {
-            throw new HttpException(`Error occurred: e${e.message}`, 400);
+            throw new HttpException(`Error occurred: ${e.message}`, 400);
         }
     }
 
-    private async s3Upload(s3, fileToUpload, fileName) {
+    private async s3Upload(fileToUpload, fileName) {
         let fileTypeOnS3;
         if (fileToUpload.mimeType === 'image/jpeg' || 'image/jpg') {
             fileTypeOnS3 = '.jpeg'
@@ -44,7 +48,7 @@ export default class ImageDetectionService {
             Body : fileToUpload.buffer,
             Key : "pan_uploads/"+fileName+fileTypeOnS3,
         };
-        return s3.upload(s3Params).promise()
+        return this.s3.upload(s3Params).promise();
     }
 
     private async s3Get(s3, fileKey) {
